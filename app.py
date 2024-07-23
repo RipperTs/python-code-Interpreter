@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_file
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ import resource
 import time
 
 app = Flask(__name__)
+load_dotenv()
 
 # 定义保存图像的目录
 IMAGE_DIR = 'images'
@@ -20,7 +22,7 @@ MAX_EXECUTION_TIME = 10  # 最大执行时间（秒）
 MAX_MEMORY_USAGE = 1024 * 1024 * 1024  # 最大内存使用量（字节）
 
 # 设置华文宋体字体
-font_path = '/System/Library/Fonts/Supplemental/Songti.ttc'  # 修改为实际路径
+font_path = os.environ.get('FONT_PATH', '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc')
 font_prop = fm.FontProperties(fname=font_path)
 plt.rcParams['font.family'] = font_prop.get_name()
 
@@ -78,5 +80,6 @@ def get_image(filename):
 
 
 if __name__ == '__main__':
-    # 启动 Flask 应用
-    app.run(host='0.0.0.0', port=14564, debug=False)
+    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+    port = int(os.environ.get('PORT', 14564))
+    app.run(host='0.0.0.0', port=port, debug=debug)
