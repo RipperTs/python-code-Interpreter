@@ -6,7 +6,7 @@
 ## 运行
 ```baah
 # Docker
-docker-compose up --build
+docker-compose up -d
 ```
 
 #### 查看字体
