@@ -39,6 +39,12 @@ def execute():
     try:
         # 从请求中获取代码
         code = request.json['code']
+        # 如果是```python```代码块，去掉代码块标记
+        if code.startswith('```python'):
+            code = code[9:]
+        # 去掉代码块结束标记
+        if code.endswith('```'):
+            code = code[:-3]
 
         # 定义一个字典来存储执行环境
         exec_env = {'pd': pd, 'plt': plt}
@@ -51,6 +57,9 @@ def execute():
 
         # 获取执行结果
         result = exec_locals.get('result', 'No result variable defined.')
+        if result == 'No result variable defined.':
+            # 如果没有定义 result 变量，尝试获取最后一个变量
+            result = exec_locals.get(list(exec_locals.keys())[-1], 'No result variable defined.')
 
         # 检查是否有图表生成
         if plt.gcf().get_axes():
