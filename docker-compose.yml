@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "14564:14564"
+    environment:
+      DEBUG: "false"
+      PORT: 14564
+      FONT_PATH: "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+    volumes:
+      - .:/app
+      - ./images:/app/images
+    restart: always
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
