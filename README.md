@@ -13,11 +13,8 @@ docker-compose up -d
 
 #### 打包最新代码并运行
 ```bash
-# 构建最新的Docker镜像
-docker-compose build
-
-# 后台运行容器
-docker-compose up -d
+# 更新需删除镜像后重新build下即可.
+docker compose build && docker compose up -d
 ```
 
 #### 查看字体
