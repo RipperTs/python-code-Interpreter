@@ -5,17 +5,15 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import traceback
 import os
-import uuid
 import resource
 import time
+import logging
+
+from utils import UtilsClass
 
 app = Flask(__name__)
 load_dotenv()
-
-# 定义保存图像的目录
-IMAGE_DIR = 'images'
-if not os.path.exists(IMAGE_DIR):
-    os.makedirs(IMAGE_DIR)
+utils = UtilsClass()
 
 # 设置资源限制
 MAX_EXECUTION_TIME = 10  # 最大执行时间（秒）
@@ -38,16 +36,12 @@ def limit_resources():
 def execute():
     try:
         # 从请求中获取代码
-        code = request.json['code']
-        # 如果是```python```代码块，去掉代码块标记
-        if code.startswith('```python'):
-            code = code[9:]
-        # 去掉代码块结束标记
-        if code.endswith('```'):
-            code = code[:-3]
+        code = request.json.get('code', '')
+        if not code:
+            return jsonify({'error': 'No code provided.'}), 400
 
-        # 去掉 plt.show() 语句, 避免弹出图表窗口阻塞程序
-        code = code.replace('plt.show()', '')
+        # 格式化代码, 将其优化为可执行的代码
+        code = utils.format_python_code(code)
 
         # 定义一个字典来存储执行环境
         exec_env = {'pd': pd, 'plt': plt}
@@ -66,16 +60,7 @@ def execute():
 
         # 检查是否有图表生成
         if plt.gcf().get_axes():
-            # 生成唯一的文件名
-            filename = f"{uuid.uuid4().hex}.png"
-            filepath = os.path.join(IMAGE_DIR, filename)
-
-            # 将图表保存到文件中
-            plt.savefig(filepath, format='png')
-            plt.close()
-
-            # 返回图像的URL
-            image_url = f"/images/{filename}"
+            image_url = utils.chart_generation(plt)
             return jsonify({'result': str(result), 'image_url': image_url, 'execution_time': execution_time})
 
         return jsonify({'result': str(result), 'execution_time': execution_time})
@@ -86,7 +71,8 @@ def execute():
 @app.route('/images/<filename>', methods=['GET'])
 def get_image(filename):
     try:
-        return send_file(os.path.join(IMAGE_DIR, filename), mimetype='image/png')
+        path_or_file = os.path.join(utils.get_image_dir(), filename)
+        return send_file(path_or_file, mimetype='image/png')
     except FileNotFoundError:
         return jsonify({'error': 'File not found'}), 404
 
