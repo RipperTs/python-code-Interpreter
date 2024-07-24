@@ -46,6 +46,9 @@ def execute():
         if code.endswith('```'):
             code = code[:-3]
 
+        # 去掉 plt.show() 语句, 避免弹出图表窗口阻塞程序
+        code = code.replace('plt.show()', '')
+
         # 定义一个字典来存储执行环境
         exec_env = {'pd': pd, 'plt': plt}
 
@@ -73,9 +76,9 @@ def execute():
 
             # 返回图像的URL
             image_url = f"/images/{filename}"
-            return jsonify({'result': result, 'image_url': image_url, 'execution_time': execution_time})
+            return jsonify({'result': str(result), 'image_url': image_url, 'execution_time': execution_time})
 
-        return jsonify({'result': result, 'execution_time': execution_time})
+        return jsonify({'result': str(result), 'execution_time': execution_time})
     except Exception as e:
         return jsonify({'error': str(e), 'traceback': traceback.format_exc()})
 
