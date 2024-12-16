@@ -5,6 +5,7 @@ import os
 import ast
 import re
 from concurrent.futures import ThreadPoolExecutor
+import asyncio
 
 
 class CodeExecutor:
@@ -13,6 +14,8 @@ class CodeExecutor:
         self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
         self.timeout = int(os.environ.get('EXECUTION_TIMEOUT', 30))
         self.docker_image = os.environ.get('DOCKER_IMAGE', 'python-executor:latest')
+        # 用于限制同时运行的容器数量
+        self.container_semaphore = asyncio.Semaphore(self.max_workers)
         # 常用包及其对应的pip包名（有些包的import名和pip安装名不一致）
         self.package_mapping = {
             'pd': 'pandas',
@@ -63,33 +66,52 @@ class CodeExecutor:
         return list(required_packages)
 
 
-    def execute_code(self, code):
-        """在Docker容器中执行代码"""
-        execution_id = str(uuid.uuid4())
-        start_time = time.time()
+    async def execute_code(self, code):
+        """异步执行代码"""
+        async with self.container_semaphore:  # 限制并发容器数量
+            execution_id = str(uuid.uuid4())
+            start_time = time.time()
 
-        try:
-            # 准备代码执行环境
-            code_file = self._prepare_code_file(execution_id, code)
+            try:
+                # 在线程池中准备代码文件
+                code_file = await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self._prepare_code_file,
+                    execution_id,
+                    code
+                )
 
-            # 在Docker容器中运行代码
-            result = self._run_in_container(execution_id, code_file)
+                # 在线程池中运行容器
+                result = await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self._run_in_container,
+                    execution_id,
+                    code_file
+                )
 
-            execution_time = time.time() - start_time
+                execution_time = time.time() - start_time
 
-            # 清理临时文件
-            self._cleanup(execution_id)
+                # 在线程池中清理临时文件
+                await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self._cleanup,
+                    execution_id
+                )
 
-            return {
-                'result': result.get('output', ''),
-                'error': result.get('error', None),
-                'execution_time': execution_time,
-                'image_url': result.get('image_url', None)
-            }
+                return {
+                    'result': result.get('output', ''),
+                    'error': result.get('error', None),
+                    'execution_time': execution_time,
+                    'image_url': result.get('image_url', None)
+                }
 
-        except Exception as e:
-            self._cleanup(execution_id)
-            return {'error': str(e)}
+            except Exception as e:
+                await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self._cleanup,
+                    execution_id
+                )
+                return {'error': str(e)}
 
     def _prepare_code_file(self, execution_id, code):
         """准备代码文件"""
@@ -160,10 +182,12 @@ result = __result
         """在Docker容器中运行代码"""
         work_dir = f"/tmp/python_executor/{execution_id}"
         output_dir = os.path.join(work_dir, "output")
+        container_name = f"python_exec_{execution_id}"
 
         cmd = [
             "docker", "run",
             "--rm",
+            "--name", container_name,  # 为容器指定唯一名称
             "--network=host",
             "--memory=1g",
             "--cpus=1",
@@ -186,7 +210,7 @@ result = __result
                 'error': process.stderr if process.returncode != 0 else None,
             }
 
-            # 只在图片文件存在时才处理图片
+            # 处理图片输出
             image_path = os.path.join(output_dir, "result.png")
             if os.path.exists(image_path):
                 timestamp = int(time.time())
@@ -195,13 +219,22 @@ result = __result
                     os.environ.get('IMAGE_STORE_PATH', './images'),
                     image_filename
                 )
+                os.makedirs(os.path.dirname(permanent_path), exist_ok=True)
                 os.rename(image_path, permanent_path)
                 result['image_url'] = f"/images/{image_filename}"
 
             return result
 
         except subprocess.TimeoutExpired:
+            # 超时时强制停止并删除容器
+            subprocess.run(["docker", "stop", container_name], capture_output=True)
+            subprocess.run(["docker", "rm", container_name], capture_output=True)
             return {'error': 'Execution timeout'}
+        except Exception as e:
+            # 确保清理容器
+            subprocess.run(["docker", "stop", container_name], capture_output=True)
+            subprocess.run(["docker", "rm", container_name], capture_output=True)
+            return {'error': str(e)}
 
     def _cleanup(self, execution_id):
         """清理临时文件"""

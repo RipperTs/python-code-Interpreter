@@ -1,49 +1,73 @@
-from flask import Flask, request, jsonify, send_file
+from fastapi import FastAPI, HTTPException
 import os
+import uvicorn
 from dotenv import load_dotenv
 import logging
+
+from starlette.responses import JSONResponse, FileResponse
+
 from executor import CodeExecutor
 from utils import UtilsClass
+from pydantic import BaseModel
 
-app = Flask(__name__)
+app = FastAPI()
 load_dotenv()
 utils = UtilsClass()
 executor = CodeExecutor()
 
 
-@app.route('/api/v1/execute', methods=['POST'])
-def execute():
-    try:
-        code = request.json.get('code', '')
-        if not code:
-            return jsonify({'error': 'No code provided.'}), 400
+class CodeRequest(BaseModel):
+    code: str
 
+
+@app.post('/api/v1/execute')
+async def execute(request: CodeRequest):
+    try:
         # 格式化代码
-        code = utils.format_python_code(code)
+        code = utils.format_python_code(request.code)
 
         # 执行代码
-        result = executor.execute_code(code)
+        result = await executor.execute_code(code)
 
         if result.get('error'):
-            return jsonify(result), 400
+            return JSONResponse(
+                content=result,
+                status_code=400
+            )
 
-        return jsonify(result)
+        return JSONResponse(content=result)
 
     except Exception as e:
         logging.error(f"Error executing code: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return JSONResponse(
+            content={'error': str(e)},
+            status_code=500
+        )
 
 
-@app.route('/images/<filename>', methods=['GET'])
+@app.get("/images/{filename}")
 def get_image(filename):
     try:
         path_or_file = os.path.join(utils.get_image_dir(), filename)
-        return send_file(path_or_file, mimetype='image/png')
+        return FileResponse(
+            path_or_file,
+            media_type="image/png"
+        )
     except FileNotFoundError:
-        return jsonify({'error': 'File not found'}), 404
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "File not found"}
+        )
 
 
 if __name__ == '__main__':
-    debug = os.environ.get('DEBUG', 'False').lower() == 'true'
-    port = int(os.environ.get('PORT', 14564))
-    app.run(host='0.0.0.0', port=port, debug=debug)
+    try:
+        import uvloop
+    except ImportError:
+        uvloop = None
+    if uvloop:
+        uvloop.install()
+
+    RELOAD = os.environ.get('DEBUG', 'False').lower() == 'true'
+    LISTEN_PORT = int(os.environ.get('PORT', 14564))
+    uvicorn.run("app:app", host="0.0.0.0", port=LISTEN_PORT, workers=1, reload=RELOAD)

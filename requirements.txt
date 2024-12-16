@@ -1,4 +1,6 @@
-Flask
+fastapi
+uvicorn
+uvloop
 pandas
 matplotlib
 numpy
