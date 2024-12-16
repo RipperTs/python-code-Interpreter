@@ -70,4 +70,4 @@ if __name__ == '__main__':
 
     RELOAD = os.environ.get('DEBUG', 'False').lower() == 'true'
     LISTEN_PORT = int(os.environ.get('PORT', 14564))
-    uvicorn.run("app:app", host="0.0.0.0", port=LISTEN_PORT, workers=1, reload=RELOAD)
+    uvicorn.run("main:app", host="0.0.0.0", port=LISTEN_PORT, workers=1, reload=RELOAD)
