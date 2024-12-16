@@ -15,8 +15,10 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 # 创建工作目录
 WORKDIR /code
 
-# 创建输出目录
-RUN mkdir -p /code/output
+# 创建目录并设置权限
+RUN mkdir -p /code/output && \
+    chmod -R 777 /code && \
+    chmod -R 777 /code/output
 
 # 设置matplotlib后端为Agg（无需显示设备）
 ENV MPLBACKEND=Agg

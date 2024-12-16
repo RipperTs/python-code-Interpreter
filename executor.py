@@ -120,7 +120,6 @@ class CodeExecutor:
         """准备代码文件"""
         work_dir = f"/tmp/python_executor/{execution_id}"
         os.makedirs(work_dir, exist_ok=True)
-        os.chmod(work_dir, 0o777)
 
         # 检测需要的包
         required_packages = self._detect_imports(code)
@@ -176,11 +175,10 @@ result = __result
         with open(code_file, 'w') as f:
             f.write(full_code)
 
-        os.chmod(code_file, 0o666)
         # 创建输出目录
         output_dir = os.path.join(work_dir, "output")
         os.makedirs(output_dir, exist_ok=True)
-        os.chmod(output_dir, 0o777)
+
         return code_file
 
     def _run_in_container(self, execution_id, code_file):
@@ -188,9 +186,6 @@ result = __result
         work_dir = f"/tmp/python_executor/{execution_id}"
         output_dir = os.path.join(work_dir, "output")
         container_name = f"python_exec_{execution_id}"
-
-        # 确保输出目录有正确的权限
-        os.chmod(output_dir, 0o777)
 
         cmd = [
             "docker", "run",
@@ -202,9 +197,7 @@ result = __result
             "-v", f"{code_file}:/code/script.py:ro",
             "-v", f"{output_dir}:/code/output",
             self.docker_image,
-            "bash", "-c",
-            # 在执行Python脚本前，先创建目录并设置权限
-            "mkdir -p /code/output && chmod -R 777 /code/output && python /code/script.py"
+            "python", "/code/script.py"
         ]
 
         try:
@@ -231,7 +224,6 @@ result = __result
                 )
                 os.makedirs(os.path.dirname(permanent_path), exist_ok=True)
                 os.rename(image_path, permanent_path)
-                os.chmod(permanent_path, 0o666)
                 result['image_url'] = f"/images/{image_filename}"
 
             return result
