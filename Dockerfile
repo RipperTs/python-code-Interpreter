@@ -23,15 +23,6 @@ RUN mkdir -p /code/output && \
 # 设置matplotlib后端为Agg（无需显示设备）
 ENV MPLBACKEND=Agg
 
-# 创建非root用户
-RUN useradd -m -r coderunner
-RUN chown -R coderunner:coderunner /code
-RUN mkdir -p /home/coderunner/.local && chown -R coderunner:coderunner /home/coderunner
-
-# 切换到非root用户
-USER coderunner
-
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1
 ENV MPLCONFIGDIR=/tmp/matplotlib
-ENV PATH="/home/coderunner/.local/bin:${PATH}"
