@@ -202,7 +202,9 @@ result = __result
             "-v", f"{code_file}:/code/script.py:ro",
             "-v", f"{output_dir}:/code/output",
             self.docker_image,
-            "python", "/code/script.py"
+            "bash", "-c",
+            # 在执行Python脚本前，先创建目录并设置权限
+            "mkdir -p /code/output && chmod -R 777 /code/output && python /code/script.py"
         ]
 
         try:
