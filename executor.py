@@ -9,6 +9,9 @@ import asyncio
 
 
 class CodeExecutor:
+    """
+    代码执行器
+    """
     def __init__(self):
         self.max_workers = int(os.environ.get('MAX_WORKERS', 4))
         self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
