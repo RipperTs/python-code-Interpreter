@@ -1,26 +1,35 @@
 FROM registry.cn-hangzhou.aliyuncs.com/ripper/python:3.9-slim
 
-# 设置工作目录
-WORKDIR /app
-
-# 安装必要的系统依赖并清理APT缓存
+# 安装必要的系统依赖和中文字体
 RUN apt-get update && apt-get install -y \
-    wget \
+    fonts-wqy-microhei \
     fonts-wqy-zenhei \
+    gcc \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 升级pip到最新版本
-RUN pip install --no-cache-dir --upgrade pip
-
 # 安装Python依赖
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+COPY requirements.txt /tmp/
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
 
-# 复制应用程序代码到镜像中
-COPY . .
+# 创建工作目录
+WORKDIR /code
 
-# 暴露端口
-EXPOSE 14564
+# 创建输出目录
+RUN mkdir -p /code/output
 
-# 运行应用程序
-CMD ["python", "main.py"]
+# 设置matplotlib后端为Agg（无需显示设备）
+ENV MPLBACKEND=Agg
+
+# 创建非root用户
+RUN useradd -m -r coderunner
+RUN chown -R coderunner:coderunner /code
+RUN mkdir -p /home/coderunner/.local && chown -R coderunner:coderunner /home/coderunner
+
+# 切换到非root用户
+USER coderunner
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV MPLCONFIGDIR=/tmp/matplotlib
+ENV PATH="/home/coderunner/.local/bin:${PATH}"
