@@ -1,22 +1,17 @@
 version: '3.8'
-
 services:
-  web:
-    build: .
-    container_name: code-interpreter   # 设置容器名称
+  code-interpreter:
+    container_name: code-interpreter
+    image: registry.cn-hangzhou.aliyuncs.com/ripper/code-interpreter-api:latest
     ports: # 端口映射
       - "14564:14564"
     environment: # 环境变量
-      DEBUG: "false"
-      PORT: 14564
-      FONT_PATH: "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+      - DEBUG=false
+      - PORT=14564
+      - MAX_WORKERS=4
+      - EXECUTION_TIMEOUT=30
+      - DOCKER_IMAGE=registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
     volumes: # 挂载目录
       - .:/app
       - ./images:/app/images
-    restart: always # 重启策略, always, on-failure, unless-stopped, no
-    networks: # 网络
-      - app-network
-
-networks:
-  app-network:
-    driver: bridge
+    restart: always
