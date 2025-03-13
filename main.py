@@ -3,6 +3,8 @@ import os
 import uvicorn
 from dotenv import load_dotenv
 import logging
+import asyncio
+from contextlib import asynccontextmanager
 
 from starlette.responses import JSONResponse, FileResponse
 
@@ -10,10 +12,22 @@ from executor import CodeExecutor
 from utils import UtilsClass
 from pydantic import BaseModel
 
-app = FastAPI()
-load_dotenv()
+# 创建工具类实例
 utils = UtilsClass()
 executor = CodeExecutor()
+
+# 定义生命周期管理器
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动时执行
+    await executor.initialize()
+    yield
+    # 关闭时执行
+    await executor.shutdown()
+
+# 使用生命周期管理器创建FastAPI应用
+app = FastAPI(lifespan=lifespan)
+load_dotenv()
 
 
 class CodeRequest(BaseModel):
