@@ -12,13 +12,6 @@ seaborn==0.12.2
 plotly==5.15.0
 bokeh==3.2.0
 
-# 机器学习和深度学习
-# 轻量级版本，不包含CUDA支持
-torch==2.0.1+cpu
-torchvision==0.15.2+cpu
-torchaudio==2.0.2+cpu
---extra-index-url https://download.pytorch.org/whl/cpu
-
 # 自然语言处理
 nltk==3.8.1
 spacy==3.6.0
