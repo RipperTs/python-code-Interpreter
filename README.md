@@ -3,19 +3,35 @@
 > 一个简单的代码解释器，支持解释Python代码, 支持 pandas, numpy, matplotlib, seaborn, scikit-learn等库
 
 
-## 如何运行
+## 运行
 
-#### 使用Docker运行
+**1. 拉取Code解释器镜像**  
 ```bash
-# Docker
-docker-compose up -d
+docker registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
 ```
 
-#### 打包最新代码并运行
+**2. 克隆仓库**   
 ```bash
-# 更新需删除镜像后重新build下即可.
-docker compose build && docker compose up -d
+git clone https://github.com/RipperTs/python-code-Interpreter.git
 ```
+
+**3. 配置ENV文件**   
+```bash
+cp .env.example .env
+```
+
+**4. 安装依赖**     
+```bash
+pip install -r requirements.txt
+```
+
+**5. 运行**     
+```bash
+python main.py
+```
+
+## 使用
+在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
 
 #### 查看字体
 ```bash
