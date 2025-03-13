@@ -43,3 +43,5 @@ sudo apt-get install fonts-wqy-zenhei
 fc-list :lang=zh
 ```
 
+#### 内置库
+查看内置库: [docker-requirements.txt](docker-requirements.txt)
