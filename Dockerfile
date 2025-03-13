@@ -1,28 +1,41 @@
 FROM registry.cn-hangzhou.aliyuncs.com/ripper/python:3.9-slim
 
-# 安装必要的系统依赖和中文字体
-RUN apt-get update && apt-get install -y \
-    fonts-wqy-microhei \
-    fonts-wqy-zenhei \
-    gcc \
-    python3-dev \
-    && rm -rf /var/lib/apt/lists/*
+LABEL maintainer="Python Code Interpreter"
+LABEL description="Optimized Python execution environment with pre-installed packages"
 
-# 安装Python依赖
-COPY requirements.txt /tmp/
-RUN pip install --no-cache-dir -r /tmp/requirements.txt
-
-# 创建工作目录
+# 设置工作目录
 WORKDIR /code
 
-# 创建目录并设置权限
-RUN mkdir -p /code/output && \
-    chmod -R 777 /code && \
-    chmod -R 777 /code/output
-
-# 设置matplotlib后端为Agg（无需显示设备）
-ENV MPLBACKEND=Agg
-
 # 设置环境变量
-ENV PYTHONUNBUFFERED=1
-ENV MPLCONFIGDIR=/tmp/matplotlib
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+# 安装系统依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    git \
+    wget \
+    fonts-wqy-microhei \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# 安装常用Python包
+COPY docker-requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r docker-requirements.txt && \
+    # 清理pip缓存
+    rm -rf /root/.cache/pip
+
+# 设置matplotlib后端为Agg（无需GUI）
+RUN mkdir -p /root/.config/matplotlib && \
+    echo "backend: Agg" > /root/.config/matplotlib/matplotlibrc
+
+# 创建输出目录
+RUN mkdir -p /code/output
+
+# 设置默认命令
+CMD ["python"]

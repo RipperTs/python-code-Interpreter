@@ -1,0 +1,50 @@
+# 数据科学和分析
+numpy==1.24.3
+pandas==2.0.2
+scipy==1.10.1
+scikit-learn==1.2.2
+statsmodels==0.14.0
+tensorflow
+
+# 数据可视化
+matplotlib==3.7.1
+seaborn==0.12.2
+plotly==5.15.0
+bokeh==3.2.0
+
+# 机器学习和深度学习
+# 轻量级版本，不包含CUDA支持
+torch==2.0.1+cpu
+torchvision==0.15.2+cpu
+torchaudio==2.0.2+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# 自然语言处理
+nltk==3.8.1
+spacy==3.6.0
+gensim==4.3.1
+
+# 图像处理
+Pillow==9.5.0
+opencv-python-headless==4.7.0.72
+
+# Web和网络
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==4.9.2
+httpx==0.24.1
+
+# 工具和实用程序
+tqdm==4.65.0
+joblib==1.2.0
+sympy==1.12
+networkx==3.1
+
+# 数据库
+sqlalchemy==2.0.16
+pymongo==4.4.0
+
+# 文件格式
+openpyxl==3.1.2
+xlrd==2.0.1
+pyyaml==6.0 
