@@ -33,6 +33,19 @@ python main.py
 ## 使用
 在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
 
+## 配置（ENV）
+- `IMAGE_STORE_PATH`：生成图片的落盘目录（默认 `./images`）
+- `IMAGE_URL_PREFIX`：接口返回的图片 URL 前缀（默认 `/images`）
+- `DOCKER_NETWORK_MODE`：容器网络模式（默认 `bridge`；更严格可设 `none`）
+- `DOCKER_PIDS_LIMIT`：容器最大进程数限制（默认 `256`）
+
+## 执行器说明
+- 服务启动后会预热并保活容器池（默认至少 1 个 `python_exec_pool_0`），长时间空闲也会自动自愈
+
+## 文件输出
+- 在代码里把文件写到容器目录 `/code/output/`，接口会把常见文件（如 `md/csv/txt/json`）落盘并在返回值的 `files` 字段里给出下载链接
+- 示例：`open('/code/output/result.md','w').write('# Hello')`
+
 #### 查看字体
 ```bash
 # 安装字体包

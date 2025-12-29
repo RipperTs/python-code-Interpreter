@@ -48,18 +48,15 @@ if [ $? -eq 0 ]; then
         echo "跳过推送镜像"
     fi
     
-    # 询问是否要更新executor.py中的镜像名称
-    read -p "是否要更新executor.py中的镜像名称? (y/n): " UPDATE_EXECUTOR
+    # 询问是否要更新 .env.example 中的 DOCKER_IMAGE（推荐通过 ENV 配置）
+    read -p "是否要更新 .env.example 中的 DOCKER_IMAGE? (y/n): " UPDATE_ENV
     
-    if [ "$UPDATE_EXECUTOR" = "y" ] || [ "$UPDATE_EXECUTOR" = "Y" ]; then
-        if [ -n "$REGISTRY" ]; then
-            # 更新executor.py中的镜像名称
-            sed -i '' "s|self.docker_image = os.environ.get('DOCKER_IMAGE', '.*')|self.docker_image = os.environ.get('DOCKER_IMAGE', '${REGISTRY}/${IMAGE_NAME}:${TAG}')|g" executor.py
-            echo "已更新executor.py中的镜像名称为: ${REGISTRY}/${IMAGE_NAME}:${TAG}"
+    if [ "$UPDATE_ENV" = "y" ] || [ "$UPDATE_ENV" = "Y" ]; then
+        if [ -f ".env.example" ]; then
+            sed -i '' "s|^DOCKER_IMAGE=.*$|DOCKER_IMAGE=${FULL_IMAGE_NAME}|g" .env.example
+            echo "已更新 .env.example 中的 DOCKER_IMAGE 为: ${FULL_IMAGE_NAME}"
         else
-            # 更新executor.py中的镜像名称为本地镜像
-            sed -i '' "s|self.docker_image = os.environ.get('DOCKER_IMAGE', '.*')|self.docker_image = os.environ.get('DOCKER_IMAGE', '${FULL_IMAGE_NAME}')|g" executor.py
-            echo "已更新executor.py中的镜像名称为: ${FULL_IMAGE_NAME}"
+            echo "未找到 .env.example，跳过更新"
         fi
     fi
     
