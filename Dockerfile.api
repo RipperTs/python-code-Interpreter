@@ -10,7 +10,10 @@ COPY requirements-api.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements-api.txt
 
-COPY *.py ./
+COPY common ./common
+COPY gateway ./gateway
+COPY executors ./executors
+COPY main.py ./
 
 ENV PORT=14564
 EXPOSE 14564

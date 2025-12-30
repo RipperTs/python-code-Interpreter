@@ -2,12 +2,19 @@
 
 > 一个简单的代码解释器，支持解释Python代码, 支持 pandas, numpy, matplotlib, seaborn, scikit-learn等库
 
+## 目录结构
+- `gateway/`：FastAPI 网关（路由、应用组装）
+- `executors/`：执行器实现（Docker 执行与容器池）
+- `common/`：通用组件（配置、协议、工具）
+- `main.py`：应用入口（保持 `python main.py` 可用）
+- `Dockerfile`：执行器镜像
+- `Dockerfile.api`：API 镜像
 
 ## 运行
 
 **1. 拉取Code解释器镜像**  
 ```bash
-docker registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
+docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
 ```
 
 **2. 克隆仓库**   
@@ -61,13 +68,22 @@ docker compose up --build --scale api=3
 在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
 
 ## 配置（ENV）
+- `DOCKER_IMAGE`：执行器镜像（默认 `registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest`）
+- `MAX_WORKERS`：最大并发（同时运行容器数）
+- `EXECUTION_TIMEOUT`：单次执行超时（秒）
+- `EXECUTOR_INSTANCE_ID`：实例 ID（多实例部署时用于避免池容器命名冲突；默认用 `HOSTNAME`）
 - `IMAGE_STORE_PATH`：生成图片的落盘目录（默认 `./images`）
 - `IMAGE_URL_PREFIX`：接口返回的图片 URL 前缀（默认 `/images`）
+- `FILE_STORE_PATH`：生成文件的落盘目录（默认 `./files`）
+- `FILE_URL_PREFIX`：接口返回的文件 URL 前缀（默认 `/files`）
 - `DOCKER_NETWORK_MODE`：容器网络模式（默认 `bridge`；更严格可设 `none`）
 - `DOCKER_PIDS_LIMIT`：容器最大进程数限制（默认 `256`）
+- `OUTPUT_ALLOWED_EXTENSIONS`：允许回传的输出文件后缀白名单（默认 `md,csv,txt,json,log`）
+- `OUTPUT_MAX_FILES/OUTPUT_FILE_MAX_BYTES/OUTPUT_TOTAL_MAX_BYTES`：输出文件数量/大小限额
+- `INPUT_MAX_FILES/INPUT_FILE_MAX_BYTES/INPUT_TOTAL_MAX_BYTES`：输入文件数量/大小限额
 
 ## 执行器说明
-- 服务启动后会预热并保活容器池（默认至少 1 个 `python_exec_pool_0`），长时间空闲也会自动自愈
+- 服务启动后会预热并保活容器池（默认至少 1 个 `python_exec_pool_<EXECUTOR_INSTANCE_ID>_0`），长时间空闲也会自动自愈
 
 ## 文件输出
 - 在代码里把文件写到容器目录 `/code/output/`，接口会把常见文件（如 `md/csv/txt/json`）落盘并在返回值的 `files` 字段里给出下载链接
