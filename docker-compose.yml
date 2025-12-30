@@ -1,5 +1,12 @@
 services:
   # 首次快速执行的话记得先拉去执行器镜像: docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
+  prepull-executor:
+    image: registry.cn-hangzhou.aliyuncs.com/ripper/docker:27-cli
+    command: [ "sh", "-c", "docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest" ]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"
+
   code-interpreter-api:
     image: registry.cn-hangzhou.aliyuncs.com/ripper/python-code-interpreter-api:latest
     environment:
@@ -18,4 +25,5 @@ services:
     volumes:
       - ./images:/data/images
       - ./files:/data/files
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
