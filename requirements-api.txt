@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+uvloop
+python-dotenv
+requests

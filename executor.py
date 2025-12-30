@@ -27,7 +27,9 @@ class CodeExecutor:
         # 用于限制同时运行的容器数量
         self.container_semaphore = asyncio.Semaphore(self.max_workers)
         self.pool_warm_size = max(1, min(self.max_workers, 2))
-        self.pool_container_prefix = "python_exec_pool_"
+        instance_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", str(self.settings.executor_instance_id or "local"))
+        instance_id = instance_id.strip("._-") or "local"
+        self.pool_container_prefix = f"python_exec_pool_{instance_id}_"
         # 常用包及其对应的pip包名（有些包的import名和pip安装名不一致）
         self.package_mapping = {
             'pd': 'pandas',
@@ -253,6 +255,8 @@ class CodeExecutor:
             "docker", "run",
             "-d",  # 后台运行
             "--name", container_id,
+            "--label", "python_executor_pool=true",
+            "--label", f"python_executor_instance={self.pool_container_prefix}",
             "--restart", "unless-stopped",
             *self._docker_run_base_args(),
             self.docker_image,

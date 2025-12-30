@@ -30,6 +30,33 @@ pip install -r requirements.txt
 python main.py
 ```
 
+## Docker 部署（推荐）
+建议把 API 服务打成镜像运行，执行器镜像通过 `DOCKER_IMAGE` 配置；API 容器需挂载宿主机 Docker Socket（用于创建执行容器）。
+
+**1. 构建 API 镜像**
+```bash
+docker build -f Dockerfile.api -t python-code-interpreter-api:latest .
+```
+
+**2. 运行 API（单实例）**
+```bash
+docker run --rm -p 14564:14564 \
+  -e DOCKER_IMAGE=registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest \
+  -e EXECUTOR_INSTANCE_ID=$(hostname) \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd)/images:/data/images \
+  -v $(pwd)/files:/data/files \
+  -e IMAGE_STORE_PATH=/data/images \
+  -e FILE_STORE_PATH=/data/files \
+  python-code-interpreter-api:latest
+```
+
+**3. 多实例（水平扩展）**
+```bash
+docker compose up --build --scale api=3
+```
+多实例时务必保证每个实例 `EXECUTOR_INSTANCE_ID` 唯一（默认用容器 `HOSTNAME` 即可），避免池容器命名冲突。
+
 ## 使用
 在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
 

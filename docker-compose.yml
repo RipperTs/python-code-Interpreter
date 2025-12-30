@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      PORT: "14564"
+      DEBUG: "false"
+      DOCKER_IMAGE: "registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"
+      DOCKER_NETWORK_MODE: "bridge"
+      DOCKER_PIDS_LIMIT: "256"
+      IMAGE_STORE_PATH: "/data/images"
+      IMAGE_URL_PREFIX: "/images"
+      FILE_STORE_PATH: "/data/files"
+      FILE_URL_PREFIX: "/files"
+      EXECUTOR_INSTANCE_ID: "${HOSTNAME}"
+    ports:
+      - "14564:14564"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./images:/data/images
+      - ./files:/data/files

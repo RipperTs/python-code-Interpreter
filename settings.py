@@ -34,6 +34,7 @@ class Settings:
     docker_image: str = "registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"
     docker_network_mode: str = "bridge"
     docker_pids_limit: int = 256
+    executor_instance_id: str = "local"
     image_store_path: str = "./images"
     image_url_prefix: str = "/images"
     file_store_path: str = "./files"
@@ -59,6 +60,10 @@ class Settings:
             ),
             docker_network_mode=os.environ.get("DOCKER_NETWORK_MODE", "bridge"),
             docker_pids_limit=_env_int("DOCKER_PIDS_LIMIT", 256),
+            executor_instance_id=os.environ.get(
+                "EXECUTOR_INSTANCE_ID",
+                os.environ.get("HOSTNAME", "local"),
+            ),
             image_store_path=os.environ.get("IMAGE_STORE_PATH", "./images"),
             image_url_prefix=os.environ.get("IMAGE_URL_PREFIX", "/images"),
             file_store_path=os.environ.get("FILE_STORE_PATH", "./files"),
