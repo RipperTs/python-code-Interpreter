@@ -23,7 +23,7 @@ jiojio==1.2.5
 Pillow==9.5.0
 opencv-python-headless==4.7.0.72
 
-# Web和网络
+# Web和网络爬虫
 requests==2.31.0
 beautifulsoup4==4.12.2
 lxml==4.9.2
@@ -36,7 +36,7 @@ sympy==1.12
 networkx==3.1
 passlib
 
-# 数据库
+# 数据库相关
 sqlalchemy==2.0.16
 pymongo==4.4.0
 sqlglot
