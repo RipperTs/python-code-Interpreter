@@ -2,140 +2,173 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目概述
+## 项目简介
 
-这是一个基于Docker的Python代码解释器服务，通过FastAPI提供REST API接口，支持在隔离容器中安全执行Python代码，并支持数据分析、可视化等常用库。
+这是一个 Python 代码解释器服务，通过 Docker 容器沙箱执行用户提交的 Python 代码，支持数据分析库（pandas、numpy、matplotlib 等）、图片生成和文件输入输出。
 
 ## 核心架构
 
-### 容器池机制 (executor.py)
+### 三层结构
+- **Gateway 层** (`gateway/`): FastAPI 应用入口与路由，处理 HTTP 请求
+- **Executor 层** (`executors/`): Docker 容器执行器，负责代码运行与容器池管理
+- **Common 层** (`common/`): 通用组件（配置 Settings、协议 Contracts、工具 Utils）
 
-- **预热容器池**: 启动时预创建2个容器并预装常用包(numpy, pandas, matplotlib)，减少代码执行延迟
-- **容器复用**: 优先使用池中容器执行代码，执行完毕后放回池中
-- **动态包安装**: 通过AST解析检测代码依赖，仅安装缺失的包
-- **包名映射**: `package_mapping`字典处理import别名(如`pd`→`pandas`)
+### 执行流程
+1. FastAPI 接收 `/api/v1/execute` POST 请求（代码 + 可选的输入文件 URL 列表）
+2. `CodeExecutor` 从容器池获取或创建容器
+3. 自动检测代码中的 import 语句，按需安装依赖包
+4. 下载输入文件到 `/code/input/`，并自动替换代码中的 URL 为容器内路径
+5. 在容器内执行代码（超时控制、资源限制）
+6. 收集输出（stdout/stderr、matplotlib 图片、`/code/output/` 目录文件）
+7. 容器放回池中复用，清理临时文件
 
-### 代码执行流程
-
-1. `main.py` 接收POST请求 → `utils.format_python_code()` 清理代码格式
-2. `executor._detect_imports()` 检测依赖包 → 生成安装脚本
-3. 优先从容器池获取容器，如无可用则创建新容器
-4. matplotlib代码自动添加中文字体配置和图表保存逻辑
-5. 执行完成后清理临时文件，容器放回池中
-
-### 异步并发设计
-
-- 使用`ThreadPoolExecutor`处理Docker操作(阻塞IO)
-- `asyncio.Semaphore`限制同时运行的容器数量(默认4个)
-- FastAPI生命周期管理器在应用启动/关闭时初始化/清理容器池
-
-## 关键配置
-
-### 环境变量 (.env)
-
-- `PORT`: 服务端口(默认14564)
-- `MAX_WORKERS`: 最大并发容器数(默认4)
-- `EXECUTION_TIMEOUT`: 代码执行超时时间(秒,默认60)
-- `DOCKER_IMAGE`: Docker镜像名称
-- `IMAGE_STORE_PATH`: 图表保存路径(默认./images)
-- `DEBUG`: 是否开启热重载
-
-### Docker镜像
-
-基础镜像已包含完整依赖，见`docker-requirements.txt`，包括：
-- 数据分析: numpy, pandas, scipy, scikit-learn
-- 可视化: matplotlib, seaborn, plotly
-- NLP: nltk, spacy
-- 图像处理: Pillow, opencv-python-headless
+### 容器池机制
+- 服务启动时预热 `pool_warm_size` 个容器（默认 `min(MAX_WORKERS, 2)`）
+- 容器命名格式：`python_exec_pool_{EXECUTOR_INSTANCE_ID}_{index}`
+- 支持多实例部署（通过 `EXECUTOR_INSTANCE_ID` 避免命名冲突）
+- 后台 keepalive 任务每 60 秒检查并自愈容器池
+- 容器复用时自动清理上次执行残留文件
 
 ## 常用命令
 
-### 开发环境
-
+### 本地开发
 ```bash
 # 安装依赖
 pip install -r requirements.txt
 
-# 启动开发服务器(支持热重载)
-DEBUG=true python main.py
+# 配置环境变量
+cp .env.example .env
 
-# 生产环境启动
+# 启动服务（开发模式，支持热重载）
 python main.py
-
-# 运行测试
-python test_executor.py
 ```
 
-### Docker操作
+### Docker 部署
 
+**构建 API 镜像：**
 ```bash
-# 拉取镜像
-docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
-
-# 构建镜像
-docker build -t python-executor:latest .
-
-# 手动清理容器
-docker rm -f $(docker ps -a | grep python_exec | awk '{print $1}')
+docker build -f Dockerfile.api -t python-code-interpreter-api:latest .
 ```
 
-## 代码修改注意事项
+**单实例运行：**
+```bash
+docker run --rm -p 14564:14564 \
+  -e DOCKER_IMAGE=registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest \
+  -e EXECUTOR_INSTANCE_ID=$(hostname) \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v $(pwd)/images:/data/images \
+  -v $(pwd)/files:/data/files \
+  python-code-interpreter-api:latest
+```
 
-### 添加新的包映射
+**Docker Compose（推荐）：**
+```bash
+# 启动（自动预拉取执行器镜像）
+docker compose up -d
 
-在`executor.py:22-38`的`package_mapping`字典中添加映射关系，格式为`'import名': 'pip包名'`
+# 多实例水平扩展
+docker compose up --scale code-interpreter-api=3
+```
 
-### 修改容器池大小
+## 关键配置
 
-在`executor._initialize_container_pool()`中调整`pool_size`，注意平衡启动速度和资源占用
+所有配置通过环境变量设置（参考 `.env.example`）：
 
-### 图表处理逻辑
+- `MAX_WORKERS`: 最大并发容器数（影响容器池大小）
+- `EXECUTION_TIMEOUT`: 单次执行超时（秒）
+- `DOCKER_IMAGE`: 执行器镜像地址
+- `EXECUTOR_INSTANCE_ID`: 实例 ID（多实例部署必须唯一，默认 `HOSTNAME`）
+- `PUBLIC_BASE_URL`: 外网访问地址（如 `https://ci.example.com`），设置后返回绝对 URL
+- `IMAGE_STORE_PATH` / `FILE_STORE_PATH`: 图片/文件落盘目录
+- `OUTPUT_ALLOWED_EXTENSIONS`: 允许回传的输出文件后缀（默认 `md,csv,txt,json,log`）
 
-- matplotlib代码会自动在末尾添加图表保存代码(executor.py:242-248)
-- 图表文件名格式: `plot_{execution_id}_{timestamp}.png`
-- 中文字体使用WenQuanYi Micro Hei(需在Docker镜像中预装)
+## 文件输入输出
 
-### 容器资源限制
+**输入文件：**
+- 请求参数 `files` 传入完整下载 URL 数组
+- 服务自动下载到容器 `/code/input/` 目录
+- 代码中的 URL 字符串自动替换为容器内路径
+- 响应返回 `inputs` 数组，包含 `local_name`（处理同名文件自动重命名）
 
-在`_run_in_container()`和`_initialize_container_pool()`中通过`--memory`和`--cpus`参数调整
+**输出文件：**
+- 代码中写入 `/code/output/` 目录的文件会自动回传
+- 支持的后缀由 `OUTPUT_ALLOWED_EXTENSIONS` 控制
+- 响应 `files` 数组返回文件下载链接
 
-## API接口
+**图片输出：**
+- Matplotlib 图表自动保存为 `result.png`
+- 响应 `image_url` 字段返回图片链接
 
-### POST /api/v1/execute
+## API 接口
 
-执行Python代码
-
-**请求体:**
+**执行代码：** `POST /api/v1/execute`
 ```json
 {
-  "code": "print('Hello World')"
+  "code": "import pandas as pd\nprint('Hello')",
+  "files": ["https://example.com/data.csv"]
 }
 ```
 
-**响应示例:**
+**响应：**
 ```json
 {
-  "result": "Hello World",
+  "result": "Hello",
   "error": null,
-  "execution_time": 0.45,
-  "image_url": "/images/plot_xxx.png"
+  "execution_time": 0.5,
+  "image_url": "/images/plot_xxx.png",
+  "files": [{"filename": "...", "url": "/files/...", "size_bytes": 1024}],
+  "inputs": [{"url": "...", "local_name": "data.csv", "local_path": "/code/input/data.csv"}]
 }
 ```
 
-### GET /images/{filename}
+**静态资源：**
+- `GET /images/{filename}`: 获取生成的图片
+- `GET /files/{filename}`: 获取生成的文件
 
-获取生成的图表图片
+## 开发注意事项
+
+### 修改执行器逻辑
+- 主要代码在 `executors/docker_executor.py`
+- 容器池初始化在 `initialize()` / `_ensure_warm_pool()`
+- 执行入口是 `execute()` 方法
+- 容器复用逻辑在 `_run_in_existing_container()`
+
+### 修改 API 路由
+- 路由定义在 `gateway/routes.py`
+- 使用 FastAPI Depends 注入 `Settings` / `ExecutionService` / `UtilsClass`
+- 新增路由需在 `router` 中注册
+
+### 依赖管理
+- API 服务依赖：`requirements.txt`
+- 执行器容器依赖：`docker-requirements.txt`（构建执行器镜像时使用）
+- 运行时按需安装：`_detect_imports()` 自动检测 import 并在容器中安装
+
+### 安全限制
+- 容器资源限制：`--memory=1g --cpus=1 --pids-limit=256`
+- 网络隔离：`DOCKER_NETWORK_MODE` 可设为 `none`（但会影响 pip）
+- 文件大小/数量限制：通过 ENV 配置
+- 输出文件白名单：防止回传可执行文件
+
+### 测试
+- 单元测试入口：`test_executor.py`
+- 测试时需确保 Docker 可用
+- 可通过 `DEBUG=true` 启用热重载模式
 
 ## 故障排查
 
-### 容器启动失败
-检查Docker镜像是否存在: `docker images | grep python-executor`
+**容器池启动失败：**
+- 检查 Docker daemon 是否运行
+- 检查 `DOCKER_IMAGE` 镜像是否已拉取
+- 查看容器日志：`docker logs python_exec_pool_{instance_id}_0`
 
-### 包安装失败
-检查`docker-requirements.txt`中的版本兼容性，或在容器中手动测试安装
+**执行超时：**
+- 调整 `EXECUTION_TIMEOUT` 环境变量
+- 检查代码是否有死循环或长时间阻塞操作
 
-### 图表不显示中文
-确保Docker镜像包含`fonts-wqy-microhei`字体包(见Dockerfile:22)
+**依赖安装失败：**
+- 确保容器网络模式不是 `none`
+- 检查 `package_mapping` 字典是否包含包名映射
 
-### 执行超时
-调整`EXECUTION_TIMEOUT`环境变量或优化代码执行效率
+**多实例命名冲突：**
+- 确保每个实例 `EXECUTOR_INSTANCE_ID` 唯一
+- 建议使用 `HOSTNAME` 或 Kubernetes Pod 名
