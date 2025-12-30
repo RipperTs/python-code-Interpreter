@@ -1,15 +1,7 @@
 services:
-  prepull-executor:
-    image: registry.cn-hangzhou.aliyuncs.com/ripper/docker:27-cli
-    command: ["sh", "-c", "docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"]
-    restart: "no"
-
+  # 首次快速执行的话记得先拉去执行器镜像: docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest
   code-interpreter-api:
     image: registry.cn-hangzhou.aliyuncs.com/ripper/python-code-interpreter-api:latest
-    pull_policy: always
-    depends_on:
-      prepull-executor:
-        condition: service_completed_successfully
     environment:
       PORT: "14564"
       PUBLIC_BASE_URL: "http://127.0.0.1:14564"
