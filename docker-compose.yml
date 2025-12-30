@@ -1,6 +1,6 @@
 services:
   prepull-executor:
-    image: docker:27-cli
+    image: registry.cn-hangzhou.aliyuncs.com/ripper/docker:27-cli
     command: ["sh", "-c", "docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"]
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
@@ -14,6 +14,7 @@ services:
         condition: service_completed_successfully
     environment:
       PORT: "14564"
+      PUBLIC_BASE_URL: ""
       DEBUG: "false"
       DOCKER_IMAGE: "registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"
       DOCKER_NETWORK_MODE: "bridge"

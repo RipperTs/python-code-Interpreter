@@ -468,6 +468,7 @@ class CodeExecutor:
         return exec_result.to_legacy_dict(
             image_url_prefix=self.settings.image_url_prefix,
             file_url_prefix=self.settings.file_url_prefix,
+            public_base_url=self.settings.public_base_url,
         )
 
     def _prepare_code_file(self, execution_id, code):

@@ -35,6 +35,7 @@ class Settings:
     docker_network_mode: str = "bridge"
     docker_pids_limit: int = 256
     executor_instance_id: str = "local"
+    public_base_url: str = ""
     image_store_path: str = "./images"
     image_url_prefix: str = "/images"
     file_store_path: str = "./files"
@@ -64,6 +65,7 @@ class Settings:
                 "EXECUTOR_INSTANCE_ID",
                 os.environ.get("HOSTNAME", "local"),
             ),
+            public_base_url=os.environ.get("PUBLIC_BASE_URL", "").strip(),
             image_store_path=os.environ.get("IMAGE_STORE_PATH", "./images"),
             image_url_prefix=os.environ.get("IMAGE_URL_PREFIX", "/images"),
             file_store_path=os.environ.get("FILE_STORE_PATH", "./files"),

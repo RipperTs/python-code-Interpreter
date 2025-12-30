@@ -43,6 +43,7 @@ async def execute(
         payload = exec_result.to_legacy_dict(
             image_url_prefix=settings.image_url_prefix,
             file_url_prefix=settings.file_url_prefix,
+            public_base_url=settings.public_base_url,
         )
         status_code = 400 if payload.get("error") else 200
         return JSONResponse(content=payload, status_code=status_code)

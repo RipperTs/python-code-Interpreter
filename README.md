@@ -78,6 +78,7 @@ docker compose up -d
 - `MAX_WORKERS`：最大并发（同时运行容器数）
 - `EXECUTION_TIMEOUT`：单次执行超时（秒）
 - `EXECUTOR_INSTANCE_ID`：实例 ID（多实例部署时用于避免池容器命名冲突；默认用 `HOSTNAME`）
+- `PUBLIC_BASE_URL`：对外访问地址（如 `https://ci.example.com`），设置后 `image_url/files[].url` 返回可直接点击的绝对链接
 - `IMAGE_STORE_PATH`：生成图片的落盘目录（默认 `./images`）
 - `IMAGE_URL_PREFIX`：接口返回的图片 URL 前缀（默认 `/images`）
 - `FILE_STORE_PATH`：生成文件的落盘目录（默认 `./files`）
