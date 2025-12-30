@@ -64,6 +64,12 @@ docker compose up --build --scale api=3
 ```
 多实例时务必保证每个实例 `EXECUTOR_INSTANCE_ID` 唯一（默认用容器 `HOSTNAME` 即可），避免池容器命名冲突。
 
+## docker-compose 运行（远程镜像）
+`docker-compose.yml` 默认直接使用远程 API 镜像，并会在启动 API 前预拉取执行器镜像，降低首次执行卡顿。
+```bash
+docker compose up -d
+```
+
 ## 使用
 在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
 

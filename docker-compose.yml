@@ -1,8 +1,17 @@
 services:
+  prepull-executor:
+    image: docker:27-cli
+    command: ["sh", "-c", "docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"
+
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    image: registry.cn-hangzhou.aliyuncs.com/ripper/python-code-interpreter-api:latest
+    pull_policy: always
+    depends_on:
+      prepull-executor:
+        condition: service_completed_successfully
     environment:
       PORT: "14564"
       DEBUG: "false"
@@ -13,10 +22,10 @@ services:
       IMAGE_URL_PREFIX: "/images"
       FILE_STORE_PATH: "/data/files"
       FILE_URL_PREFIX: "/files"
-      EXECUTOR_INSTANCE_ID: "${HOSTNAME}"
     ports:
       - "14564:14564"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./images:/data/images
       - ./files:/data/files
+    restart: unless-stopped
