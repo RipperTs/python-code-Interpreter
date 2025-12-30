@@ -72,6 +72,7 @@ docker compose up -d
 
 ## 使用
 在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
+- `POST /api/v1/execute` 接口无论成功/失败都会返回 HTTP 200，通过返回体里的 `error` 字段是否为空来判断是否执行成功
 
 ## 配置（ENV）
 - `DOCKER_IMAGE`：执行器镜像（默认 `registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest`）
@@ -99,6 +100,7 @@ docker compose up -d
 ## 文件输入
 - 请求 `POST /api/v1/execute` 可传 `files`（字符串数组，元素为完整下载地址），服务会先下载到容器目录 `/code/input/`
 - 如果你的代码里直接使用了下载地址字符串，服务会自动把它替换成容器内路径（`/code/input/<filename>`）
+- 文件名推断优先级：URL 查询参数 `filename` > 响应头 `Content-Disposition` > URL path basename；若同名冲突会自动重命名（如 `2_data.csv`）
 - 建议写法：`pd.read_csv('/code/input/data.csv')` 或直接 `pd.read_csv('data.csv')`（有文件输入时会在 `/code/input` 目录执行）
 - 响应会返回 `inputs` 映射；若出现同名文件，会自动重命名（如 `2_data.csv`），可用 `inputs[*].local_name` 精确引用
 

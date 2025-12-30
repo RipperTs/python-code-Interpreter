@@ -6,7 +6,7 @@ import ast
 import re
 import shutil
 import json
-from urllib.parse import urlparse, unquote
+from urllib.parse import urlparse, unquote, parse_qs
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
@@ -85,6 +85,49 @@ class CodeExecutor:
         if not name or name in {".", ".."}:
             return ""
         return name
+
+    def _parse_content_disposition_filename(self, value: str) -> str:
+        if not value:
+            return ""
+
+        # RFC 5987: filename*=UTF-8''<urlencoded>
+        match = re.search(r"filename\*\s*=\s*([^;]+)", value, flags=re.IGNORECASE)
+        if match:
+            part = match.group(1).strip().strip('"')
+            if "''" in part:
+                part = part.split("''", 1)[1]
+            name = self._sanitize_filename(unquote(part))
+            if name:
+                return name
+
+        match = re.search(r'filename\s*=\s*"?([^";]+)"?', value, flags=re.IGNORECASE)
+        if match:
+            name = self._sanitize_filename(match.group(1).strip())
+            if name:
+                return name
+
+        return ""
+
+    def _infer_input_original_name(self, url: str, content_disposition: str = "") -> str:
+        parsed = urlparse(url)
+
+        query = parse_qs(parsed.query or "")
+        for key in ("filename", "file_name", "name", "file"):
+            if key not in query:
+                continue
+            values = query.get(key) or []
+            if not values or not values[0]:
+                continue
+            candidate = self._sanitize_filename(unquote(values[0]))
+            if candidate:
+                return candidate
+
+        header_name = self._parse_content_disposition_filename(content_disposition or "")
+        if header_name:
+            return header_name
+
+        path_name = self._sanitize_filename(unquote(os.path.basename(parsed.path)))
+        return path_name
 
     def _is_allowed_output_file(self, name: str) -> bool:
         if not name or name == "result.png":
@@ -171,20 +214,22 @@ class CodeExecutor:
             if parsed.scheme not in {"http", "https"}:
                 raise RuntimeError(f"Unsupported file url scheme: {parsed.scheme}")
 
-            name = unquote(os.path.basename(parsed.path))
-            original_name = self._sanitize_filename(name) or f"file_{idx}"
-
-            # 避免同名覆盖
-            dst_name = original_name
-            if os.path.exists(os.path.join(input_dir, dst_name)):
-                dst_name = f"{idx}_{original_name}"
-
-            dst_path = os.path.join(input_dir, dst_name)
-
             resp = requests.get(url, stream=True, timeout=30, allow_redirects=True)
             try:
                 if resp.status_code != 200:
                     raise RuntimeError(f"Failed to download file: {url} (status={resp.status_code})")
+
+                original_name = (
+                    self._infer_input_original_name(url, resp.headers.get("Content-Disposition", ""))
+                    or f"file_{idx}"
+                )
+
+                # 避免同名覆盖
+                dst_name = original_name
+                if os.path.exists(os.path.join(input_dir, dst_name)):
+                    dst_name = f"{idx}_{original_name}"
+
+                dst_path = os.path.join(input_dir, dst_name)
 
                 size_bytes = 0
                 with open(dst_path, "wb") as f:

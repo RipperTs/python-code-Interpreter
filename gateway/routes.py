@@ -1,6 +1,7 @@
 import os
 import logging
 import mimetypes
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -45,11 +46,19 @@ async def execute(
             file_url_prefix=settings.file_url_prefix,
             public_base_url=settings.public_base_url,
         )
-        status_code = 400 if payload.get("error") else 200
-        return JSONResponse(content=payload, status_code=status_code)
+        # 下游仅通过 `error` 字段判断成功/失败，因此统一返回 200。
+        return JSONResponse(content=payload, status_code=200)
     except Exception as e:
-        logging.error(f"Error executing code: {str(e)}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logging.exception("Error executing code")
+        payload = {
+            "result": "",
+            "error": traceback.format_exc(),
+            "execution_time": 0,
+            "image_url": None,
+            "files": [],
+            "inputs": [],
+        }
+        return JSONResponse(content=payload, status_code=200)
 
 
 @router.get("/images/{filename}")
