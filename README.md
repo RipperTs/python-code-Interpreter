@@ -1,6 +1,6 @@
 # Code解释器
 
-> 一个简单的代码解释器，支持解释Python代码, 支持 pandas, numpy, matplotlib, seaborn, scikit-learn等库
+> 一个[代码解释器](https://platform.openai.com/docs/guides/tools-code-interpreter)，支持解释Python代码, 支持 pandas, numpy, matplotlib, seaborn, scikit-learn等库, 并且可以生成图片和文件输出。
 
 ## 目录结构
 - `gateway/`：FastAPI 网关（路由、应用组装）

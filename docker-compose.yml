@@ -2,11 +2,9 @@ services:
   prepull-executor:
     image: registry.cn-hangzhou.aliyuncs.com/ripper/docker:27-cli
     command: ["sh", "-c", "docker pull registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"]
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
     restart: "no"
 
-  api:
+  code-interpreter-api:
     image: registry.cn-hangzhou.aliyuncs.com/ripper/python-code-interpreter-api:latest
     pull_policy: always
     depends_on:
@@ -14,7 +12,7 @@ services:
         condition: service_completed_successfully
     environment:
       PORT: "14564"
-      PUBLIC_BASE_URL: ""
+      PUBLIC_BASE_URL: "http://127.0.0.1:14564"
       DEBUG: "false"
       DOCKER_IMAGE: "registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest"
       DOCKER_NETWORK_MODE: "bridge"
@@ -26,7 +24,6 @@ services:
     ports:
       - "14564:14564"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - ./images:/data/images
       - ./files:/data/files
     restart: unless-stopped
