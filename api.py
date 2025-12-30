@@ -3,7 +3,7 @@ import logging
 import mimetypes
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.responses import FileResponse, JSONResponse
 
 from execution_service import ExecuteRequest, ExecutionService
@@ -15,6 +15,7 @@ router = APIRouter()
 
 class CodeRequest(BaseModel):
     code: str
+    files: list[str] = Field(default_factory=list)
 
 
 def get_settings(request: Request) -> Settings:
@@ -38,7 +39,7 @@ async def execute(
 ):
     try:
         code = utils.format_python_code(request.code)
-        exec_result = await service.execute(ExecuteRequest(code=code))
+        exec_result = await service.execute(ExecuteRequest(code=code, files=request.files))
         payload = exec_result.to_legacy_dict(
             image_url_prefix=settings.image_url_prefix,
             file_url_prefix=settings.file_url_prefix,

@@ -21,6 +21,7 @@ ptuning.json
 lora
 applogs
 __pycache__
+files/
 answers.json
 answers.jsonl
 answers_back.json

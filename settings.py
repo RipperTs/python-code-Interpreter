@@ -38,6 +38,9 @@ class Settings:
     image_url_prefix: str = "/images"
     file_store_path: str = "./files"
     file_url_prefix: str = "/files"
+    input_max_files: int = 10
+    input_file_max_bytes: int = 20 * 1024 * 1024
+    input_total_max_bytes: int = 50 * 1024 * 1024
     output_max_files: int = 20
     output_file_max_bytes: int = 5 * 1024 * 1024
     output_total_max_bytes: int = 20 * 1024 * 1024
@@ -60,6 +63,9 @@ class Settings:
             image_url_prefix=os.environ.get("IMAGE_URL_PREFIX", "/images"),
             file_store_path=os.environ.get("FILE_STORE_PATH", "./files"),
             file_url_prefix=os.environ.get("FILE_URL_PREFIX", "/files"),
+            input_max_files=_env_int("INPUT_MAX_FILES", 10),
+            input_file_max_bytes=_env_int("INPUT_FILE_MAX_BYTES", 20 * 1024 * 1024),
+            input_total_max_bytes=_env_int("INPUT_TOTAL_MAX_BYTES", 50 * 1024 * 1024),
             output_max_files=_env_int("OUTPUT_MAX_FILES", 20),
             output_file_max_bytes=_env_int("OUTPUT_FILE_MAX_BYTES", 5 * 1024 * 1024),
             output_total_max_bytes=_env_int("OUTPUT_TOTAL_MAX_BYTES", 20 * 1024 * 1024),

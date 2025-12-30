@@ -6,10 +6,11 @@ import ast
 import re
 import shutil
 import json
+from urllib.parse import urlparse, unquote
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
-from execution_service import ExecuteRequest, ExecuteResult, OutputFile
+from execution_service import ExecuteRequest, ExecuteResult, InputFile, OutputFile
 from settings import Settings
 
 
@@ -139,6 +140,87 @@ class CodeExecutor:
             total_bytes += size_bytes
 
         return results
+
+    def _download_input_files(self, execution_id: str, urls: list[str]):
+        if not urls:
+            return "", {}, []
+
+        safe_urls = [u for u in urls if isinstance(u, str) and u.strip()]
+        if not safe_urls:
+            return "", {}, []
+
+        if len(safe_urls) > self.settings.input_max_files:
+            raise RuntimeError(f"Too many input files, max={self.settings.input_max_files}")
+
+        work_dir = f"/tmp/python_executor/{execution_id}"
+        input_dir = os.path.join(work_dir, "input")
+        os.makedirs(input_dir, exist_ok=True)
+        os.chmod(input_dir, 0o777)
+
+        # 延迟 import：避免在未使用该功能时引入额外开销
+        import requests
+
+        url_to_container_path: dict[str, str] = {}
+        inputs: list[InputFile] = []
+        total_bytes = 0
+
+        for idx, url in enumerate(safe_urls, start=1):
+            parsed = urlparse(url)
+            if parsed.scheme not in {"http", "https"}:
+                raise RuntimeError(f"Unsupported file url scheme: {parsed.scheme}")
+
+            name = unquote(os.path.basename(parsed.path))
+            original_name = self._sanitize_filename(name) or f"file_{idx}"
+
+            # 避免同名覆盖
+            dst_name = original_name
+            if os.path.exists(os.path.join(input_dir, dst_name)):
+                dst_name = f"{idx}_{original_name}"
+
+            dst_path = os.path.join(input_dir, dst_name)
+
+            resp = requests.get(url, stream=True, timeout=30, allow_redirects=True)
+            try:
+                if resp.status_code != 200:
+                    raise RuntimeError(f"Failed to download file: {url} (status={resp.status_code})")
+
+                size_bytes = 0
+                with open(dst_path, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=1024 * 1024):
+                        if not chunk:
+                            continue
+                        size_bytes += len(chunk)
+                        if size_bytes > self.settings.input_file_max_bytes:
+                            raise RuntimeError(
+                                f"Input file too large: {dst_name} > {self.settings.input_file_max_bytes} bytes"
+                            )
+                        if total_bytes + size_bytes > self.settings.input_total_max_bytes:
+                            raise RuntimeError(
+                                f"Total input files too large > {self.settings.input_total_max_bytes} bytes"
+                            )
+                        f.write(chunk)
+            finally:
+                resp.close()
+
+            os.chmod(dst_path, 0o666)
+            total_bytes += size_bytes
+            url_to_container_path[url] = f"/code/input/{dst_name}"
+            inputs.append(
+                InputFile(
+                    url=url,
+                    original_name=original_name,
+                    local_name=dst_name,
+                    size_bytes=size_bytes,
+                )
+            )
+
+        return input_dir, url_to_container_path, inputs
+
+    def _rewrite_code_for_input_files(self, code: str, url_to_container_path: dict[str, str]) -> str:
+        rewritten = code
+        for url, container_path in url_to_container_path.items():
+            rewritten = rewritten.replace(url, container_path)
+        return rewritten
 
     def _pool_container_names(self):
         return [f"{self.pool_container_prefix}{i}" for i in range(self.pool_warm_size)]
@@ -296,11 +378,19 @@ class CodeExecutor:
                         self.in_use_pool_containers.add(container_id)
 
                 # 在线程池中准备代码文件
+                input_dir, url_to_container_path, inputs = await asyncio.get_event_loop().run_in_executor(
+                    self.executor,
+                    self._download_input_files,
+                    execution_id,
+                    request.files
+                )
+                rewritten_code = self._rewrite_code_for_input_files(request.code, url_to_container_path)
+
                 code_file = await asyncio.get_event_loop().run_in_executor(
                     self.executor,
                     self._prepare_code_file,
                     execution_id,
-                    request.code
+                    rewritten_code
                 )
 
                 # 在线程池中运行代码
@@ -309,7 +399,8 @@ class CodeExecutor:
                     self._run_code,
                     execution_id,
                     code_file,
-                    container_id
+                    container_id,
+                    input_dir
                 )
 
                 execution_time = time.time() - start_time
@@ -342,6 +433,7 @@ class CodeExecutor:
                     execution_time=execution_time,
                     image_filename=run_result.get("image_filename"),
                     files=files,
+                    inputs=inputs,
                 )
 
             except Exception as e:
@@ -363,6 +455,7 @@ class CodeExecutor:
                     execution_time=time.time() - start_time,
                     image_filename=None,
                     files=[],
+                    inputs=[],
                 )
 
     async def execute_code(self, code):
@@ -445,7 +538,7 @@ if 'plt' in globals() and plt.get_fignums():
         os.chmod(output_dir, 0o777)
         return code_file
 
-    def _run_code(self, execution_id, code_file, container_id=None):
+    def _run_code(self, execution_id, code_file, container_id=None, input_dir: str = ""):
         """在Docker容器中运行代码"""
         work_dir = f"/tmp/python_executor/{execution_id}"
         output_dir = os.path.join(work_dir, "output")
@@ -455,18 +548,32 @@ if 'plt' in globals() and plt.get_fignums():
         
         if container_id:
             # 使用已存在的容器
-            return self._run_in_existing_container(execution_id, code_file, output_dir, container_id)
+            return self._run_in_existing_container(
+                execution_id, code_file, output_dir, container_id, input_dir
+            )
         else:
             # 创建新容器
-            return self._run_in_container(execution_id, code_file)
+            return self._run_in_container(execution_id, code_file, input_dir)
 
-    def _run_in_existing_container(self, execution_id, code_file, output_dir, container_id):
+    def _run_in_existing_container(self, execution_id, code_file, output_dir, container_id, input_dir: str = ""):
         """在已存在的容器中运行代码"""
         try:
             # 复制代码文件到容器
             copy_cmd = ["docker", "cp", code_file, f"{container_id}:/code/script.py"]
             subprocess.run(copy_cmd, check=True, capture_output=True)
             
+            # 准备输入目录并拷贝文件
+            has_input = bool(input_dir) and os.path.isdir(input_dir) and os.listdir(input_dir)
+            if has_input:
+                prepare_input_cmd = [
+                    "docker", "exec", container_id,
+                    "bash", "-c",
+                    "mkdir -p /code/input && rm -rf /code/input/*"
+                ]
+                subprocess.run(prepare_input_cmd, check=True, capture_output=True)
+                copy_input_cmd = ["docker", "cp", f"{input_dir}/.", f"{container_id}:/code/input"]
+                subprocess.run(copy_input_cmd, check=True, capture_output=True)
+
             # 准备输出目录（清空旧产物）
             prepare_output_cmd = [
                 "docker", "exec", container_id,
@@ -476,8 +583,9 @@ if 'plt' in globals() and plt.get_fignums():
             subprocess.run(prepare_output_cmd, check=True, capture_output=True)
             
             # 执行代码
+            exec_workdir_args = ["-w", "/code/input"] if has_input else []
             exec_cmd = [
-                "docker", "exec", container_id,
+                "docker", "exec", *exec_workdir_args, container_id,
                 "bash", "-c",
                 (
                     f"if command -v timeout >/dev/null 2>&1; then "
@@ -562,6 +670,11 @@ if 'plt' in globals() and plt.get_fignums():
                 "rm -rf /code/output/*"
             ]
             subprocess.run(cleanup_output_cmd, capture_output=True)
+            if has_input:
+                subprocess.run(
+                    ["docker", "exec", container_id, "bash", "-c", "rm -rf /code/input/*"],
+                    capture_output=True
+                )
             
             return result
             
@@ -579,7 +692,7 @@ if 'plt' in globals() and plt.get_fignums():
         except Exception as e:
             return {'error': str(e)}
 
-    def _run_in_container(self, execution_id, code_file):
+    def _run_in_container(self, execution_id, code_file, input_dir: str = ""):
         """在新Docker容器中运行代码"""
         work_dir = f"/tmp/python_executor/{execution_id}"
         output_dir = os.path.join(work_dir, "output")
@@ -588,13 +701,21 @@ if 'plt' in globals() and plt.get_fignums():
         # 确保输出目录有正确的权限
         os.chmod(output_dir, 0o777)
 
+        has_input = bool(input_dir) and os.path.isdir(input_dir) and os.listdir(input_dir)
+        mounts = [
+            "-v", f"{code_file}:/code/script.py:ro",
+            "-v", f"{output_dir}:/code/output",
+        ]
+        if has_input:
+            mounts.extend(["-v", f"{input_dir}:/code/input:ro"])
+
         cmd = [
             "docker", "run",
             "--rm",
             "--name", container_name,  # 为容器指定唯一名称
             *self._docker_run_base_args(),
-            "-v", f"{code_file}:/code/script.py:ro",
-            "-v", f"{output_dir}:/code/output",
+            *mounts,
+            "-w", "/code/input" if has_input else "/code",
             self.docker_image,
             "python", "/code/script.py"
         ]

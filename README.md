@@ -46,6 +46,12 @@ python main.py
 - 在代码里把文件写到容器目录 `/code/output/`，接口会把常见文件（如 `md/csv/txt/json`）落盘并在返回值的 `files` 字段里给出下载链接
 - 示例：`open('/code/output/result.md','w').write('# Hello')`
 
+## 文件输入
+- 请求 `POST /api/v1/execute` 可传 `files`（字符串数组，元素为完整下载地址），服务会先下载到容器目录 `/code/input/`
+- 如果你的代码里直接使用了下载地址字符串，服务会自动把它替换成容器内路径（`/code/input/<filename>`）
+- 建议写法：`pd.read_csv('/code/input/data.csv')` 或直接 `pd.read_csv('data.csv')`（有文件输入时会在 `/code/input` 目录执行）
+- 响应会返回 `inputs` 映射；若出现同名文件，会自动重命名（如 `2_data.csv`），可用 `inputs[*].local_name` 精确引用
+
 #### 查看字体
 ```bash
 # 安装字体包
