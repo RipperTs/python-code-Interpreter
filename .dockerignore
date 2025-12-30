@@ -1,0 +1,24 @@
+.git
+.github
+.idea
+.vscode
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+
+# local env/secrets
+.env
+.env.*
+
+# runtime/generated data
+images/
+files/
+logs/
+*.log
+**/*.log
+
+# editor/OS junk
+*.swp
