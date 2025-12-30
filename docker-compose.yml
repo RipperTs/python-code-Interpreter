@@ -9,6 +9,7 @@ services:
 
   code-interpreter-api:
     image: registry.cn-hangzhou.aliyuncs.com/ripper/python-code-interpreter-api:latest
+    container_name: code-interpreter-api
     pull_policy: always
     depends_on:
       prepull-executor:
@@ -30,4 +31,4 @@ services:
       - ./images:/data/images
       - ./files:/data/files
       - /var/run/docker.sock:/var/run/docker.sock
-    restart: unless-stopped
+    restart: always
