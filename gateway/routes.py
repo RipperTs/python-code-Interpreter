@@ -2,11 +2,13 @@ import os
 import logging
 import mimetypes
 import traceback
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from starlette.responses import FileResponse, JSONResponse
 
+from common.capabilities import get_executor_runtime_info
 from common.contracts import ExecuteRequest, ExecutionService
 from common.settings import Settings
 from common.utils import UtilsClass
@@ -19,6 +21,18 @@ class CodeRequest(BaseModel):
     files: list[str] = Field(default_factory=list)
 
 
+class InstalledPackage(BaseModel):
+    name: str
+    version: str
+
+
+class CapabilitiesResponse(BaseModel):
+    pythonVersion: Optional[str] = None
+    installedPackages: list[InstalledPackage] = Field(default_factory=list)
+    limits: dict = Field(default_factory=dict)
+    networkPolicy: dict = Field(default_factory=dict)
+
+
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
 
@@ -29,6 +43,61 @@ def get_utils(request: Request) -> UtilsClass:
 
 def get_execution_service(request: Request) -> ExecutionService:
     return request.app.state.execution_service
+
+
+@router.get("/capabilities", response_model=CapabilitiesResponse)
+def capabilities(settings: Settings = Depends(get_settings)):
+    runtime = get_executor_runtime_info(settings)
+
+    limits = {
+        "maxConcurrency": settings.max_workers,
+        "executionTimeoutSeconds": settings.execution_timeout,
+        "container": {
+            "memory": "1g",
+            "cpus": 1,
+            "pidsLimit": settings.docker_pids_limit,
+        },
+        "input": {
+            "maxFiles": settings.input_max_files,
+            "maxFileBytes": settings.input_file_max_bytes,
+            "totalMaxBytes": settings.input_total_max_bytes,
+        },
+        "output": {
+            "maxFiles": settings.output_max_files,
+            "maxFileBytes": settings.output_file_max_bytes,
+            "totalMaxBytes": settings.output_total_max_bytes,
+            "allowedExtensions": sorted(list(settings.output_allowed_extensions or set())),
+        },
+    }
+
+    internet_access = (settings.docker_network_mode or "").strip().lower() != "none"
+    network_policy = {
+        "executorNetworkMode": settings.docker_network_mode,
+        "internetAccess": internet_access,
+        "supportsHttpInputFiles": True,
+        "supportsPipInstall": internet_access,
+        "introspection": {
+            "ok": runtime.ok,
+            "error": runtime.error,
+        },
+    }
+
+    installed_packages = []
+    for item in runtime.installed_packages or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        version = str(item.get("version", "")).strip()
+        if not name:
+            continue
+        installed_packages.append(InstalledPackage(name=name, version=version))
+
+    return CapabilitiesResponse(
+        pythonVersion=runtime.python_version,
+        installedPackages=installed_packages,
+        limits=limits,
+        networkPolicy=network_policy,
+    )
 
 
 @router.post("/api/v1/execute")

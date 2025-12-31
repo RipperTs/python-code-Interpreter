@@ -73,6 +73,7 @@ docker compose up -d
 ## 使用
 在线接口文档: https://apifox.com/apidoc/shared-1dd2957c-1f9e-4179-80a3-c6e16790feeb
 - `POST /api/v1/execute` 接口无论成功/失败都会返回 HTTP 200，通过返回体里的 `error` 字段是否为空来判断是否执行成功
+- `GET /capabilities` 返回解释器能力信息（`pythonVersion`、`installedPackages`、`limits`、`networkPolicy`），便于调用方在执行前判断运行环境与限制
 
 ## 配置（ENV）
 - `DOCKER_IMAGE`：执行器镜像（默认 `registry.cn-hangzhou.aliyuncs.com/ripper/python-executor:latest`）
